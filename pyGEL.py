@@ -30,13 +30,16 @@ class Gel(object):
             output.append(box_transform_1channel(points,self.image[:,:,channel],nx,ny))
         self.image=np.dstack(output).astype(self.color_depth)
 
+#class Line(object):
+#    def __init__(self,data):
+#        self.
 
 points=np.array([[ 80,  20],
                  [500, 182],
                  [ 98, 440],
                  [400,460]])
                  
-a=Gel('123.jpg')
+a=Gel('running_dog.jpg')
 #a.rgb2grayscale()
 lol=a.box_transform(points)
-#a.show()
+a.show()
