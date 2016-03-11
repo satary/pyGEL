@@ -10,6 +10,9 @@ import peakutils
 from scipy import ndimage, optimize, stats, misc
 
 def build_grid(p,nx,ny):
+    '''
+    creation grid 4 points
+    '''
     px=p[:,0]
     py=p[:,1]
     #creating matrixes of indexes for given nx and ny
@@ -28,7 +31,7 @@ def build_grid(p,nx,ny):
     
 def box_transform_1channel(points,input_img,nx=0,ny=0):
     '''
-    
+    creation new coords in image, 4 points
     '''
     if (nx == 0) or (ny == 0):
         nx= int(np.linalg.norm((points[0]-points[2]+points[1]-points[3])/2).round())
@@ -47,42 +50,58 @@ def box_transform_1channel(points,input_img,nx=0,ny=0):
     
     coords=np.dstack((b,a)).reshape(-1,2)
     return griddata(coords, input_img.flatten(), (x, y), method='linear')
-#    
-#def index_peak():
-#    nuc = np.average(nuc,1)[:,1]
-#    nuc = 256 - nuc
-#    x = np.arange(nuc.size) 
-#    y_nuc = ndimage.filters.gaussian_filter(nuc,sigma=2)
-#    indexes = peakutils.peak.indexes(y_nuc, thres=0.5, min_dist=5)
-#    return indexes
-#    
-#def     
-#    center_nuc=x[indexes][::-1]
-#    height_nuc=y_nuc[indexes][::-1]
-#    width_nuc = np.zeros(height_nuc.size)+1
-#    shift=np.zeros(1)
-#    guess=np.hstack((shift,height_nuc,width_nuc,center_nuc))
-#    return guess, center
     
-def lorenzian(args,x):
-    shift=args[0]
-    args=args[1:].reshape(3,-1)
-    center=args[2]+shift
-    height=args[0]
-    width=args[1]
-    lorn_sum=np.zeros(x.size)
-    for i in np.arange(center.size):
-        lorn_sum+= height[i]*(1.0/np.pi)*(0.5*width[i])/((x - center[i])**2+(0.5*width[i])**2)
-    return lorn_sum      
+def squarte_box(p,input_img):
+    '''
+    creation new coords in image, 2 points
+    '''
+    p1=p[0]
+    p2=p[1]
+    return input_img[p1[1]:p2[1],p1[0]:p2[0]]
 
-def min_lorn(args,x,y,centers):
-    shift=args[0]
-    ar=args[1:].reshape(3,-1)
-    center=ar[2]+shift
-    height=ar[0]
-    width=ar[1]
-    j=(width < 0) | (width > 0.05*height)
-    i= height < 0 
-    return np.sum(( lorenzian(args,x)-y)**2) + 0.1*np.sum((centers-center)**2) + np.sum(height[i]**2) + np.sum(width[j]**2)
+#def track(p,lane):
+#    
+
+class Fit(object):
+    '''
+    fitting lorenzian 
+    '''
+    def __init__(self, line):
+        self.line=line
+        self.x = np.arange(self.line.size)
+        self.y = ndimage.filters.gaussian_filter(self.line,sigma=2)
+        self.indexes = peakutils.peak.indexes(self.y, thres=0.5, min_dist=5)
+        self.center=self.x[self.indexes][::-1]
+        self.height=self.y[self.indexes][::-1]
+        self.width= np.zeros(self.height.size)+1
+        self.guess=np.hstack((np.zeros(1),self.height,self.width,self.center))
+        
+        
+    def lorenzian(self,arg,x):
+        shift=arg[0]
+        args=arg[1:].reshape(3,-1)
+        center=args[2]+shift
+        height=args[0]
+        width=args[1]
+        lorn_sum=np.zeros(x.size)
+        for i in np.arange(center.size):
+            lorn_sum+= height[i]*(1.0/np.pi)*(0.5*width[i])/((x - center[i])**2+(0.5*width[i])**2)
+        return lorn_sum      
     
-   
+    def min_lorn(self, arg, x, y, centers):
+        shift=arg[0]
+        ar=arg[1:].reshape(3,-1)
+        center=ar[2]+shift
+        height=ar[0]
+        width=ar[1]
+        j=(width < 0) | (width > 0.05*height)
+        i= height < 0 
+        return np.sum(( self.lorenzian(arg,x)-y)**2) + 0.1*np.sum((centers-center)**2) + np.sum(height[i]**2) + np.sum(width[j]**2)
+       
+    def optim(self):
+        '''
+        getting area lorenzian
+        '''
+        optim = optimize.fmin_powell(self.min_lorn, self.guess , args=(self.x, self.y, self.center), maxiter=20)
+        return optim
+     
