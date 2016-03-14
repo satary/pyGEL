@@ -33,11 +33,14 @@ class Gel(object):
     def get_lane(self,point):
         return Lane(self.image,point)
         
-
+#    def creation_lane(self,points):
+#        for         
+#        lane={}
+        
         
 
 class Lane(object):
-    def __init__(self,data=None, point=None, data_mass=None):
+    def __init__(self,data=None, point=None, data_mass=None, data_text=None):
         if not(data is None):
             '''
             given image with points 
@@ -60,6 +63,8 @@ class Lane(object):
                 self.data = 256 -self. data
         elif not(data_mass is None):
              self.data = data_mass
+        else:
+            self.data= np.loadtxt(data_text)
 
      
      
