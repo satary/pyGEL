@@ -92,7 +92,7 @@ class Fit(object):
         center=args[2]+shift
         height=args[0]
         width=args[1]
-        guas_sum=np.zeros(x.size)
+        gaus_sum=np.zeros(x.size)
         for i in np.arange(center.size):
             gaus_sum+= height[i]*1.0/(width[i]*np.sqrt(2*np.pi))*np.exp(-(x - center[i])**2/(2*width[i]**2))
         return gaus_sum
@@ -105,7 +105,7 @@ class Fit(object):
         width=args[1]
         weib_sum=np.zeros(x.size)
         for i in np.arange(center.size):
-            weib_sum+= height[i]*(0.5/width[i])*(((x-center[i])/width[i])**(-0.5))*np.exp(-1/0.5*((x-center[i])/width[i])**0.5)
+            weib_sum+= height[i]*(2/width[i])*np.exp(-((x-center[i])/width[i])**2)
         return weib_sum 
     
     def min_lorn(self, arg, x, y, centers):
@@ -128,7 +128,7 @@ class Fit(object):
         i= height < 0 
         return np.sum(( self.gaussian(arg,x)-y)**2) + 0.1*np.sum((centers-center)**2) + np.sum(height[i]**2) + np.sum(width[j]**2)
         
-    def min_weib(self, arg, x, y, centers):
+    def min_weib(self,arg, x, y, centers):
         shift=arg[0]
         ar=arg[1:].reshape(3,-1)
         center=ar[2]+shift
@@ -142,26 +142,26 @@ class Fit(object):
         '''
         getting area lorenzian
         '''
-        optim_lorn = optimize.fmin_powell(self.min_lorn, self.guess , args=(self.x, self.y, self.center), maxiter=20)
+        optim_lorn = optimize.fmin_powell(self.min_lorn, self.guess , args=(self.x, self.y, self.center), maxiter=10)
         return optim_lorn
         
     def optim_gaussian(self):
         '''
         getting area gaussian
         '''
-        optim_gaus = optimize.fmin_powell(self.min_gaus, self.guess , args=(self.x, self.y, self.center), maxiter=20)
+        optim_gaus = optimize.fmin_powell(self.min_gaus, self.guess , args=(self.x, self.y, self.center), maxiter=10)
         return optim_gaus
         
     def optim_weibull(self):
         '''
         getting area weibull
         '''
-        optim_weib = optimize.fmin_powell(self.min_weib, self.guess , args=(self.x, self.y, self.center), maxiter=20)
+        optim_weib = optimize.fmin_powell(self.min_weib, self.guess , args=(self.x, self.y, self.center), maxiter=10)
         return optim_weib
         
-    def show(self):
+    def show(self,b):
         plt.plot(self.x,self.y)
-        plt.plot(self.x, weibull(self.optim_weibull(),self.x))
+        plt.plot(self.x, self.weibull(b,self.x))
         plt.show()
 #
 f=misc.imread('footprint_b1.png')
@@ -169,29 +169,10 @@ nuc = f[50:1190, 10:20]
 nuc = np.average(nuc,1)[:,1]
 nuc = 256 - nuc
 a=Fit(nuc)
-#b = a.optim_weibull() 
+b = a.optim_weibull() 
 
-#def weibull(arg,x):
-#    shift=arg[0]
-#    args=arg[1:].reshape(3,-1)
-#    center=args[2]+shift
-#    height=args[0]
-#    width=args[1]
-#    weib_sum=np.zeros(x.size)
-#    for i in np.arange(center.size):
-#        weib_sum+= height[i]*0.5/width[i]*((x-center[i])/width[i])**(-0.5)*np.exp(-1/0.5*((x-center[i])/width[i])**0.5)
-#    return weib_sum
+
 #
-#plt.plot(a.x,weibull(b,a.x))
-#plt.plot(a.x,a.y) 
-#plt.show()  
-#shift=b[0]
-#o_nuc=b[1:].reshape(3,-1)
-#c_nuc=o_nuc[2]+shift
-#h_nuc=o_nuc[0]
-#w_nuc=o_nuc[1]
-
-
 #for i in np.arange(c_nuc.size):
-#    plt.plot(a.x,np.zeros(a.x.size)+h_nuc[i]*0.5/w_nuc[i]*((a.x-c_nuc[i])/w_nuc[i])**0.5*np.exp(-1/0.5*((a.x-c_nuc[i])/w_nuc[i])**0.5))
-    
+#    plt.plot(a.x,np.zeros(a.x.size)+h_nuc[i]*np.exp(-1/2*((a.x-c_nuc[i])/w_nuc[i])**2))
+#    
