@@ -60,19 +60,66 @@ def squarte_box(p,input_img):
     return input_img[p1[1]:p2[1],p1[0]:p2[0]]
 
 
-class Fit(object):
-    '''
-    fitting function 
-    '''
+
+
+class Distribution(object):
     def __init__(self, line):
-        self.line=line
-        self.x = np.arange(self.line.size)
-        self.y = ndimage.filters.gaussian_filter(self.line,sigma=2)
-        self.indexes = peakutils.peak.indexes(self.y, thres=0.5, min_dist=5)
-        self.center=self.x[self.indexes][::-1]
-        self.height=self.y[self.indexes][::-1]
-        self.width= np.zeros(self.height.size)+1
-        self.guess=np.hstack((np.zeros(1),self.height,self.width,self.center))
+        self.line=line[::-1]
+        self.x_axis = np.arange(self.line.size)
+        self.line_reflected = max(self.line) - self.line
+#        self.width= np.zeros(self.height.size)+1
+#        self.guess=np.hstack((np.zeros(1),self.height,self.width,self.center))
+        
+    def index_peak(self, sigma=2,thres=0.5,min_dist=5):
+        '''
+        sigma - Standard deviation for Gaussian kernel.
+        thres -  Normalized threshold. Only the peaks with amplitude higher than the threshold will be detected.
+        min_dist -  Minimum distance between each detected peak. The peak with the highest amplitude is preferred to satisfy this constraint. 
+        '''
+        line = ndimage.filters.gaussian_filter(self.line,sigma=sigma)
+        indexes = peakutils.peak.indexes(line, thres=thres, min_dist=min_dist)
+        return indexes
+        
+    def center_peak(self):
+        '''
+        position peak
+        '''
+        center=self.x_axis[self.index_peak()]
+        return center
+        
+    def height(self):
+        
+        height=self.line[self.index_peak()]
+        return height
+    
+    def position_min_peak(self, sigma=2, thres=0.2, min_dist=2):
+        '''
+        sigma - Standard deviation for Gaussian kernel.
+        thres -  Normalized threshold. Only the peaks with amplitude higher than the threshold will be detected.
+        min_dist -  Minimum distance between each detected peak. The peak with the highest amplitude is preferred to satisfy this constraint. 
+        '''
+        line_reflected = ndimage.filters.gaussian_filter(self.line_reflected,sigma=sigma)
+        index_min = peakutils.peak.indexes(line_reflected, thres=thres, min_dist=min_dist)
+        return index_min
+        
+    def one_peak(self,i):
+        '''
+        i-number peak
+        '''
+        return self.line[self.position_min_peak()[i]:self.position_min_peak()[i+1]]        
+        
+    def area_peak(self,i):
+        a = self.one_peak(i)[:-1]
+        b = self.one_peak(i)[1:]
+        area = sum(0.5*(a+b))
+        return area 
+        
+        
+    def width(self):
+        width = []
+        for i in np.arange(self.position_min_peak().size - 1):
+            width+=2/np.pi*self.area_peak(i)/self.height[i+1]
+        return width
         
         
     def lorenzian(self,arg,x):
@@ -138,38 +185,53 @@ class Fit(object):
         i= height < 0 
         return np.sum(( self.weibull(arg,x)-y)**2) + 0.1*np.sum((centers-center)**2) + np.sum(height[i]**2) + np.sum(width[j]**2)
        
-    def optim_lorenzian(self):
-        '''
-        getting area lorenzian
-        '''
-        optim_lorn = optimize.fmin_powell(self.min_lorn, self.guess , args=(self.x, self.y, self.center), maxiter=10)
-        return optim_lorn
-        
-    def optim_gaussian(self):
-        '''
-        getting area gaussian
-        '''
-        optim_gaus = optimize.fmin_powell(self.min_gaus, self.guess , args=(self.x, self.y, self.center), maxiter=10)
-        return optim_gaus
-        
-    def optim_weibull(self):
-        '''
-        getting area weibull
-        '''
-        optim_weib = optimize.fmin_powell(self.min_weib, self.guess , args=(self.x, self.y, self.center), maxiter=10)
-        return optim_weib
-        
-    def show(self,b):
-        plt.plot(self.x,self.y)
-        plt.plot(self.x, self.weibull(b,self.x))
-        plt.show()
-#
-f=misc.imread('footprint_b1.png')
-nuc = f[50:1190, 10:20]
-nuc = np.average(nuc,1)[:,1]
-nuc = 256 - nuc
-a=Fit(nuc)
-b = a.optim_weibull() 
+
+
+
+
+
+
+
+
+#class Fit(object):
+#    '''
+#    fitting function 
+#    '''
+#    def __init__(self,data):
+#        
+#    
+#    def optim_lorenzian(self):
+#        '''
+#        getting area lorenzian
+#        '''
+#        optim_lorn = optimize.fmin_powell(self.min_lorn, self.guess , args=(self.x, self.y, self.center), maxiter=10)
+#        return optim_lorn
+#        
+#    def optim_gaussian(self):
+#        '''
+#        getting area gaussian
+#        '''
+#        optim_gaus = optimize.fmin_powell(self.min_gaus, self.guess , args=(self.x, self.y, self.center), maxiter=10)
+#        return optim_gaus
+#        
+#    def optim_weibull(self):
+#        '''
+#        getting area weibull
+#        '''
+#        optim_weib = optimize.fmin_powell(self.min_weib, self.guess , args=(self.x, self.y, self.center), maxiter=10)
+#        return optim_weib
+#        
+#    def show(self,b):
+#        plt.plot(self.x,self.y)
+#        plt.plot(self.x, self.weibull(b,self.x))
+#        plt.show()
+##
+#f=misc.imread('footprint_b1.png')
+#nuc = f[50:1190, 10:20]
+#nuc = np.average(nuc,1)[:,1]
+#nuc = 256 - nuc
+#a=Fit(nuc)
+#b = a.optim_weibull() 
 
 
 #
