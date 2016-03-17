@@ -87,7 +87,7 @@ class Distribution(object):
         center=self.x_axis[self.index_peak()]
         return center
         
-    def height(self):
+    def height_peak(self):
         
         height=self.line[self.index_peak()]
         return height
@@ -109,16 +109,23 @@ class Distribution(object):
         return self.line[self.position_min_peak()[i]:self.position_min_peak()[i+1]]        
         
     def area_peak(self,i):
+        '''
+        area one peak
+        i- number peak
+        '''
         a = self.one_peak(i)[:-1]
         b = self.one_peak(i)[1:]
         area = sum(0.5*(a+b))
         return area 
         
         
-    def width(self):
-        width = []
-        for i in np.arange(self.position_min_peak().size - 1):
-            width+=2/np.pi*self.area_peak(i)/self.height[i+1]
+    def width_peak(self):
+        '''
+        appoximate width distribution
+        '''
+        width = np.zeros(self.position_min_peak().size-1)
+        for i in np.arange(self.position_min_peak().size-1):
+            width[i]=2/np.pi*self.area_peak(i)/self.height_peak()[i+1]
         return width
         
         
