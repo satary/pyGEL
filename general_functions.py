@@ -64,19 +64,31 @@ def squarte_box(p,input_img):
 
 class Distribution(object):
     def __init__(self, line):
-        self.line=line[::-1]
-        self.x_axis = np.arange(self.line.size)
+        self.line=line
         self.line_reflected = max(self.line) - self.line
-#        self.width= np.zeros(self.height.size)+1
-#        self.guess=np.hstack((np.zeros(1),self.height,self.width,self.center))
+        self.line_new=self.line[self.position_min_peak()[0]:self.position_min_peak()[-1]]
+        self.x_axis = np.arange(self.line_new.size)
         
-    def index_peak(self, sigma=2,thres=0.5,min_dist=5):
+        
+    def position_min_peak(self, sigma=3, thres=0.2, min_dist=2):
         '''
         sigma - Standard deviation for Gaussian kernel.
         thres -  Normalized threshold. Only the peaks with amplitude higher than the threshold will be detected.
         min_dist -  Minimum distance between each detected peak. The peak with the highest amplitude is preferred to satisfy this constraint. 
         '''
-        line = ndimage.filters.gaussian_filter(self.line,sigma=sigma)
+        line_reflected = ndimage.filters.gaussian_filter(self.line_reflected,sigma=sigma)
+        index_min = peakutils.peak.indexes(line_reflected, thres=thres, min_dist=min_dist)
+        return index_min
+
+        
+        
+    def index_peak(self, sigma=3,thres=0.2,min_dist=2):
+        '''
+        sigma - Standard deviation for Gaussian kernel.
+        thres -  Normalized threshold. Only the peaks with amplitude higher than the threshold will be detected.
+        min_dist -  Minimum distance between each detected peak. The peak with the highest amplitude is preferred to satisfy this constraint. 
+        '''
+        line = ndimage.filters.gaussian_filter(self.line_new,sigma=sigma)
         indexes = peakutils.peak.indexes(line, thres=thres, min_dist=min_dist)
         return indexes
         
@@ -92,15 +104,7 @@ class Distribution(object):
         height=self.line[self.index_peak()]
         return height
     
-    def position_min_peak(self, sigma=2, thres=0.2, min_dist=2):
-        '''
-        sigma - Standard deviation for Gaussian kernel.
-        thres -  Normalized threshold. Only the peaks with amplitude higher than the threshold will be detected.
-        min_dist -  Minimum distance between each detected peak. The peak with the highest amplitude is preferred to satisfy this constraint. 
-        '''
-        line_reflected = ndimage.filters.gaussian_filter(self.line_reflected,sigma=sigma)
-        index_min = peakutils.peak.indexes(line_reflected, thres=thres, min_dist=min_dist)
-        return index_min
+
         
     def one_peak(self,i):
         '''
@@ -115,31 +119,70 @@ class Distribution(object):
         '''
         a = self.one_peak(i)[:-1]
         b = self.one_peak(i)[1:]
-        area = sum(0.5*(a+b))
+        area = 0.5*np.sum(a+b)
         return area 
         
         
-    def width_peak(self):
+    def width_and_area_peak(self):
         '''
-        appoximate width distribution
+        appoximate width and coefficient(area) distribution
         '''
         width = np.zeros(self.position_min_peak().size-1)
+        area = np.zeros(self.position_min_peak().size-1)
         for i in np.arange(self.position_min_peak().size-1):
-            width[i]=2/np.pi*self.area_peak(i)/self.height_peak()[i+1]
-        return width
+            width[i] = (2/np.pi)*(self.area_peak(i)/self.height_peak()[i])
+            '''
+            w = 2/(pi * y),  y = h/S
+            '''
+            area[i] = self.area_peak(i) 
+        return width , area
+        
+    def guess(self):
+        '''
+        parametrs distribution (area, center, width)
+        '''
+        guess = np.hstack((self.width_and_area_peak()[0],self.width_and_area_peak()[1],self.center_peak()))
+        return guess
+        
+    def lorenzian(self,height,width,x,center):
+        lorn = height*(1.0/np.pi)*(0.5*width)/((x - center)**2+(0.5*width)**2)
+        return lorn
         
         
-    def lorenzian(self,arg,x):
-        shift=arg[0]
-        args=arg[1:].reshape(3,-1)
-        center=args[2]+shift
-        height=args[0]
-        width=args[1]
+    def show_peak(self,arg):
+#        arg = self.optim_lorenzian().reshape(2,-1)
+        arg=arg.reshape(3,-1)
+        height=arg[1]
+        width=arg[0]
+        center=arg[2]
+        for i in np.arange(centers.size):
+            plt.plot(self.x_axis, self.lorenzian(height[i],width[i],self.x_axis,center[i]))
+            plt.show()
+    
+    def show(self,arg):
+        plt.plot(self.line_new)
+        plt.plot(self.x_axis,self.sum_lorenzian(arg, self.x_axis))
+        plt.show()
+    
+    def sum_lorenzian(self,args,x):
+        args = args.reshape(3,-1)
+        height=args[1]
+        width=args[0]
+        center=args[2]
         lorn_sum=np.zeros(x.size)
         for i in np.arange(center.size):
             lorn_sum+= height[i]*(1.0/np.pi)*(0.5*width[i])/((x - center[i])**2+(0.5*width[i])**2)
         return lorn_sum 
+
         
+    def sum_difference_square(self, args, x, y):
+#        args = args.reshape(2,-1)
+#        height=args[1]
+#        width=args[0]
+#        j=(width > 0.05*height)
+        return np.sum((self.sum_lorenzian(args,x)-y)**2) # + np.sum(width[j]**2)         
+
+
     def gaussian(self, arg,x):
         shift=arg[0]
         args=arg[1:].reshape(3,-1)
@@ -162,15 +205,7 @@ class Distribution(object):
             weib_sum+= height[i]*(2/width[i])*np.exp(-((x-center[i])/width[i])**2)
         return weib_sum 
     
-    def min_lorn(self, arg, x, y, centers):
-        shift=arg[0]
-        ar=arg[1:].reshape(3,-1)
-        center=ar[2]+shift
-        height=ar[0]
-        width=ar[1]
-        j=(width < 0) | (width > 0.05*height)
-        i= height < 0 
-        return np.sum(( self.lorenzian(arg,x)-y)**2) + 0.1*np.sum((centers-center)**2) + np.sum(height[i]**2) + np.sum(width[j]**2)
+
         
     def min_gaus(self, arg, x, y, centers):
         shift=arg[0]
@@ -192,10 +227,21 @@ class Distribution(object):
         i= height < 0 
         return np.sum(( self.weibull(arg,x)-y)**2) + 0.1*np.sum((centers-center)**2) + np.sum(height[i]**2) + np.sum(width[j]**2)
        
+    def optim_lorenzian(self):
+        '''
+        getting area lorenzian
+        '''
+        optim_lorn = optimize.fmin_powell(self.sum_difference_square, self.guess() , args=(self.x_axis, self.line_new), maxiter = 1)
+        return optim_lorn
 
-
-
-
+def ratio_height_width(arg):
+    arg=arg.reshape(2,-1)
+    c = np.zeros(arg[0].size)
+    d = np.arange(arg[0].size) 
+    for i in np.arange(arg[0].size):
+        c[i]+= arg[0,i]/arg[1,i]
+    plt.plot(d,c)
+    plt.show()
 
 
 
@@ -239,9 +285,4 @@ class Distribution(object):
 #nuc = 256 - nuc
 #a=Fit(nuc)
 #b = a.optim_weibull() 
-
-
-#
-#for i in np.arange(c_nuc.size):
-#    plt.plot(a.x,np.zeros(a.x.size)+h_nuc[i]*np.exp(-1/2*((a.x-c_nuc[i])/w_nuc[i])**2))
-#    
+#f=np.genfromtxt('20130116gel-BS-lane-3.txt')
