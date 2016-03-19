@@ -150,6 +150,15 @@ class Distribution(object):
         
     
     def lorenzian(self,height,width,x,center):
+        '''
+        distribution Lorenza (area, center, width)
+        
+        y = area * 1/pi *(0.5*width)/((x-center)**2 +(0.5*width)**2)
+        
+        area - the area under curve
+        center - position one peak
+        width - width distibution        
+        '''
         lorn = height*(1.0/np.pi)*(0.5*width)/((x - center)**2+(0.5*width)**2)
         return lorn
         
@@ -198,10 +207,22 @@ class Distribution(object):
             
     
     def gaussian(self,height,width,x,center):
+        '''
+        distribution Gaussa (area, center, width)
+        
+        y= area * 1/(width*sqrt(2*pi)) * exp(-(x-center)**2/(2*width**2))
+        
+        area - the area under curve
+        center - position one peak
+        width - width distibution
+        '''
         gaus = height*1.0/(width*np.sqrt(2*np.pi))*np.exp(-(x - center)**2/(2*width**2))
         return gaus
         
     def sum_gaussian(self, args,x):
+        '''
+        sum gaussian all peak
+        '''
         args=args.reshape(3,-1)
         center=args[2]
         height=args[1]
@@ -239,7 +260,7 @@ class Distribution(object):
         return guess   
         
     def weibull(self,height,width,x,center):
-        weibull= height*(1/(width*np.sqrt(np.pi)))*np.exp(-((x-center)/width)**2)
+        weibull= height*(2/(width*np.sqrt(np.pi)))*np.exp(-0.5*((x-center)/width)**2)
         return weibull
     
     def sum_weibull(self,args,x):
