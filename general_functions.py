@@ -8,6 +8,8 @@ import numpy as np
 from scipy.interpolate import griddata
 import peakutils
 from scipy import ndimage, optimize, stats, misc
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 
 def build_grid(p,nx,ny):
     '''
@@ -92,16 +94,16 @@ class Distribution(object):
         indexes = peakutils.peak.indexes(line, thres=thres, min_dist=min_dist)
         return indexes
         
-    def center_peak(self):
+    def center_peak(self, sigma=2,thres=0.1,min_dist=1):
         '''
         position peak
         '''
-        center=self.x_axis[self.index_peak()]
+        center=self.x_axis[self.index_peak(sigma,thres,min_dist)]
         return center
         
-    def height_peak(self):
+    def height_peak(self, sigma=2,thres=0.1,min_dist=1):
         
-        height=self.line[self.index_peak()]
+        height=self.line[self.index_peak(sigma,thres,min_dist)]
         return height
     
 
@@ -127,25 +129,25 @@ class Distribution(object):
     distribution Lorenzian
     '''        
         
-    def width_and_area_peak_lorn(self):
+    def width_and_area_peak_lorn(self, sigma=2,thres=0.1,min_dist=1):
         '''
         appoximate width and coefficient(area) distribution Lorenzian
         '''
         width = np.zeros(self.position_min_peak().size-1)
         area = np.zeros(self.position_min_peak().size-1)
         for i in np.arange(self.position_min_peak().size-1):
-            width[i] = (2/np.pi)*(self.area_peak(i)/self.height_peak()[i])
+            width[i] = (2/np.pi)*(self.area_peak(i)/self.height_peak( sigma,thres,min_dist)[i])
             '''
             w = 2/(pi * y),  y = h/S
             '''
             area[i] = self.area_peak(i) 
         return width , area
         
-    def guess_lorn(self):
+    def guess_lorn(self, sigma=2,thres=0.1,min_dist=1):
         '''
         parametrs distribution Lorenzian (area, center, width)
         '''
-        guess = np.hstack((self.width_and_area_peak_lorn()[0],self.width_and_area_peak_lorn()[1],self.center_peak()))
+        guess = np.hstack((self.width_and_area_peak_lorn()[0],self.width_and_area_peak_lorn()[1],self.center_peak( sigma,thres,min_dist)))
         return guess
         
     
@@ -184,25 +186,25 @@ class Distribution(object):
     distribution Gaussian
     '''
        
-    def width_and_area_peak_gaus(self):
+    def width_and_area_peak_gaus(self, sigma=2,thres=0.1,min_dist=1):
         '''
         appoximate width and coefficient(area) distribution Gaussian
         '''
         width = np.zeros(self.position_min_peak().size-1)
         area = np.zeros(self.position_min_peak().size-1)
         for i in np.arange(self.position_min_peak().size-1):
-            width[i] = (1/np.sqrt(2*np.pi))*(self.area_peak(i)/self.height_peak()[i])
+            width[i] = (1/np.sqrt(2*np.pi))*(self.area_peak(i)/self.height_peak( sigma,thres,min_dist)[i])
             '''
             w = 1/(sqpr(2*pi) * y),  y = h/S
             '''
             area[i] = self.area_peak(i) 
         return width , area
         
-    def guess_gaus(self):
+    def guess_gaus(self, sigma=2,thres=0.1,min_dist=1):
         '''
         parametrs distribution Gaussian (area, center, width)
         '''
-        guess = np.hstack((self.width_and_area_peak_gaus()[0],self.width_and_area_peak_gaus()[1],self.center_peak()))
+        guess = np.hstack((self.width_and_area_peak_gaus()[0],self.width_and_area_peak_gaus()[1],self.center_peak( sigma,thres,min_dist)))
         return guess    
             
     
@@ -234,84 +236,104 @@ class Distribution(object):
         
     def sum_difference_square_gaussian(self, args, x, y):
         return np.sum(( self.sum_gaussian(args,x)-y)**2) 
-    
+
     '''
     disrtibution Weibull
     '''
-    def width_and_area_peak_weibull(self):
+    def gamma_width_area_peak_weibull(self, sigma=2,thres=0.1,min_dist=1):
         '''
         appoximate width and coefficient(area) distribution Weibull
         '''
+        gamma = np.zeros(self.position_min_peak().size-1)+1
+#        area = np.zeros(self.position_min_peak().size-1)        
         width = np.zeros(self.position_min_peak().size-1)
-        area = np.zeros(self.position_min_peak().size-1)
         for i in np.arange(self.position_min_peak().size-1):
-            width[i] = (2/np.sqrt(np.pi))*(self.area_peak(i)/self.height_peak()[i])
+            width[i] = (1/np.sqrt(2*np.pi))*(self.area_peak(i)/self.height_peak( sigma,thres,min_dist)[i])
             '''
             w = 2/(sqpr(pi) * y),  y = h/S
             '''
-            area[i] = self.area_peak(i) 
-        return width , area
+#            area[i] = self.area_peak(i)
+        return  width, gamma
         
-    def guess_weibull(self):
+    def guess_weibull(self, sigma=2,thres=0.1,min_dist=1):
         '''
         parametrs distribution Weibull (area, center, width)
         '''
-        guess = np.hstack((self.width_and_area_peak_weibull()[0],self.width_and_area_peak_weibull()[1],self.center_peak()))
+        guess = np.hstack((self. gamma_width_area_peak_weibull()[0],self. gamma_width_area_peak_weibull()[1],self.height_peak( sigma,thres,min_dist),self.center_peak( sigma,thres,min_dist)))
         return guess   
         
-    def weibull(self,height,width,x,center):
-        weibull= height*(2/(width*np.sqrt(np.pi)))*np.exp(-0.5*((x-center)/width)**2)
+    def weibull(self,height,width,x,center,gamma):
+        weibull= height*(gamma/width)*np.exp(-(1/gamma)*(np.abs(x-center)/width)**gamma)
         return weibull
     
     def sum_weibull(self,args,x):
-        args=args.reshape(3,-1)
-        center=args[2]
-        height=args[1]
+        args=args.reshape(4,-1)
+        center=args[3]
+        height=args[2]
+        gamma=args[1]
         width=args[0]
         weib_sum=np.zeros(x.size)
         for i in np.arange(center.size):
-            weib_sum+= height[i]*(2/(width[i]*np.sqrt(np.pi)))*np.exp(-0.5*((x-center[i])/width[i])**2)
+            weib_sum+= height[i]*(gamma[i]/width[i])*np.exp(-(1/gamma[i])*(np.abs(x-center[i])/width[i])**gamma[i])
         return weib_sum 
         
     def sum_difference_square_weibull(self,args, x, y):
-        return np.sum(( self.sum_weibull(args,x)-y)**2) 
+#        args=args.reshape(4,-1)
+#        gamma=args[1]
+#        j=(gamma < 0) | (gamma > 2)
+        return np.sum(( self.sum_weibull(args,x)-y)**2)#+ 2000*np.sum(gamma[j]**2)
        
-    def optim_lorenzian(self):
+    def optim_lorenzian(self, sigma=2,thres=0.1,min_dist=1):
         '''
         optimization Lorenzian
         '''
-        optim = optimize.fmin_powell(self.sum_difference_square_lorenzian, self.guess_lorn() , args=(self.x_axis, self.line_new), maxiter = 2)
+        optim = optimize.fmin_powell(self.sum_difference_square_lorenzian, self.guess_lorn( sigma,thres,min_dist) , args=(self.x_axis, self.line_new), maxiter = 2)
         return optim
         
-    def optim_gaussian(self):
+    def optim_gaussian(self, sigma=2,thres=0.1,min_dist=1):
         '''
         optimization Gaussian
         '''
-        optim = optimize.fmin_powell(self.sum_difference_square_gaussian, self.guess_gaus() , args=(self.x_axis, self.line_new), maxiter = 2)
+        optim = optimize.fmin_powell(self.sum_difference_square_gaussian, self.guess_gaus( sigma,thres,min_dist) , args=(self.x_axis, self.line_new), maxiter = 2)
         return optim
     
-    def optim_weibull(self):
+    def optim_weibull(self, sigma=2,thres=0.1,min_dist=1):
         '''
         optimization Weibull
         '''
-        optim = optimize.fmin_powell(self.sum_difference_square_weibull, self.guess_weibull() , args=(self.x_axis, self.line_new), maxiter = 2)
+        optim = optimize.fmin_powell(self.sum_difference_square_weibull, self.guess_weibull( sigma,thres,min_dist) , args=(self.x_axis, self.line_new), maxiter = 2)
         return optim
     
     def show_peak(self,arg):
 #        arg = self.optim_lorenzian().reshape(2,-1)
-        arg=arg.reshape(3,-1)
-        height=arg[1]
+        arg=arg.reshape(4,-1)
+        height=arg[2]
         width=arg[0]
-        center=arg[2]
+        center=arg[3]
+        gamma=arg[1]
         for i in np.arange(center.size):
-            plt.plot(self.x_axis, self.weibull(height[i],width[i],self.x_axis,center[i]))
+            plt.plot(self.x_axis, self.weibull(height[i],width[i],self.x_axis,center[i],gamma[i]))
             plt.show()
     
     def show(self,arg):
-        plt.plot(self.line_new)
-        plt.plot(self.x_axis,self.sum_weibull(arg, self.x_axis))
-        plt.show()
+        plot=plt.figure(figsize=(20,10))
+        plot=plot.add_subplot(111)
         
+        plot.plot(self.line_new)
+        plot.plot(self.x_axis,self.sum_weibull(arg, self.x_axis))
+        
+        
+        plot.set_title(u'Распределение Weibull')
+        plot.set_ylabel(u'Интенсивность', fontsize=15)
+        plot.get_xaxis().set_visible(False)
+
+#        plt.savefig('weibull.png') 
+        
+    def tabl(self,arg):
+        arg = arg.reshape(3,-1)
+        a=np.arange(arg[0].size)
+        tabl=np.vstack((a,arg[2],arg[1])).T
+        b=np.savetxt('lorenzian.txt',tabl)
         
         
 def ratio_height_width(arg):
