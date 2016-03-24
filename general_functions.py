@@ -65,62 +65,62 @@ def squarte_box(p,input_img):
 
 
 class Distribution(object):
-    def __init__(self, line):
+    def __init__(self, line, sigma=2, thres_min=0.1, min_dist=1):
         self.line=line
         self.line_reflected = max(self.line) - self.line
-        self.line_new=self.line[self.position_min_peak()[0]:self.position_min_peak()[-1]]
+        self.line_new=self.line[self.position_min_peak(sigma,thres_min,min_dist)[0]:self.position_min_peak(sigma,thres_min,min_dist)[-1]]
         self.x_axis = np.arange(self.line_new.size)
         
         
-    def position_min_peak(self, sigma=2, thres=0.1, min_dist=1):
+    def position_min_peak(self, sigma=2, thres_min=0.1, min_dist=1):
         '''
         sigma - Standard deviation for Gaussian kernel.
-        thres -  Normalized threshold. Only the peaks with amplitude higher than the threshold will be detected.
+        thres_min -  Normalized threshold. Only the peaks with amplitude higher than the threshold will be detected. For local minim
         min_dist -  Minimum distance between each detected peak. The peak with the highest amplitude is preferred to satisfy this constraint. 
         '''
         line_reflected = ndimage.filters.gaussian_filter(self.line_reflected,sigma=sigma)
-        index_min = peakutils.peak.indexes(line_reflected, thres=thres, min_dist=min_dist)
+        index_min = peakutils.peak.indexes(line_reflected, thres=thres_min, min_dist=min_dist)
         return index_min
 
         
         
-    def index_peak(self, sigma=2,thres=0.1,min_dist=1):
+    def index_peak(self, sigma=2,thres_peak=0.1,min_dist=1):
         '''
         sigma - Standard deviation for Gaussian kernel.
-        thres -  Normalized threshold. Only the peaks with amplitude higher than the threshold will be detected.
+        thres_peak -  Normalized threshold. Only the peaks with amplitude higher than the threshold will be detected.
         min_dist -  Minimum distance between each detected peak. The peak with the highest amplitude is preferred to satisfy this constraint. 
         '''
         line = ndimage.filters.gaussian_filter(self.line_new,sigma=sigma)
-        indexes = peakutils.peak.indexes(line, thres=thres, min_dist=min_dist)
+        indexes = peakutils.peak.indexes(line, thres=thres_peak, min_dist=min_dist)
         return indexes
         
-    def center_peak(self, sigma=2,thres=0.1,min_dist=1):
+    def center_peak(self, sigma=2,thres_peak=0.1,min_dist=1):
         '''
         position peak
         '''
-        center=self.x_axis[self.index_peak(sigma,thres,min_dist)]
+        center=self.x_axis[self.index_peak(sigma,thres_peak,min_dist)]
         return center
         
-    def height_peak(self, sigma=2,thres=0.1,min_dist=1):
+    def height_peak(self, sigma=2,thres_peak=0.1,min_dist=1):
         
-        height=self.line[self.index_peak(sigma,thres,min_dist)]
+        height=self.line[self.index_peak(sigma,thres_peak,min_dist)]
         return height
     
 
         
-    def one_peak(self,i):
+    def one_peak(self,i, sigma=2, thres_min=0.1, min_dist=1):
         '''
         i-number peak
         '''
-        return self.line[self.position_min_peak()[i]:self.position_min_peak()[i+1]]        
+        return self.line[self.position_min_peak(sigma,thres_min,min_dist)[i]:self.position_min_peak(sigma,thres_min,min_dist)[i+1]]        
         
-    def area_peak(self,i):
+    def area_peak(self,i, sigma=2, thres_min=0.1, min_dist=1):
         '''
         area one peak
         i- number peak
         '''
-        a = self.one_peak(i)[:-1]
-        b = self.one_peak(i)[1:]
+        a = self.one_peak(i,sigma,thres_min,min_dist)[:-1]
+        b = self.one_peak(i,sigma,thres_min,min_dist)[1:]
         area = 0.5*np.sum(a+b)
         return area 
 
@@ -129,25 +129,25 @@ class Distribution(object):
     distribution Lorenzian
     '''        
         
-    def width_and_area_peak_lorn(self, sigma=2,thres=0.1,min_dist=1):
+    def width_and_area_peak_lorn(self, sigma=2,thres_min=0.1,thres_peak=0.1,min_dist=1):
         '''
         appoximate width and coefficient(area) distribution Lorenzian
         '''
-        width = np.zeros(self.position_min_peak().size-1)
-        area = np.zeros(self.position_min_peak().size-1)
-        for i in np.arange(self.position_min_peak().size-1):
-            width[i] = (2/np.pi)*(self.area_peak(i)/self.height_peak( sigma,thres,min_dist)[i])
+        width = np.zeros(self.position_min_peak(sigma,thres_min,min_dist).size-1)
+        area = np.zeros(self.position_min_peak(sigma,thres_min,min_dist).size-1)
+        for i in np.arange(self.position_min_peak(sigma,thres_min,min_dist).size-1):
+            width[i] = (2/np.pi)*(self.area_peak(i,sigma,thres_min,min_dist)/self.height_peak( sigma,thres_peak,min_dist)[i])
             '''
             w = 2/(pi * y),  y = h/S
             '''
-            area[i] = self.area_peak(i) 
+            area[i] = self.area_peak(i,sigma,thres_min,min_dist) 
         return width , area
         
-    def guess_lorn(self, sigma=2,thres=0.1,min_dist=1):
+    def guess_lorn(self, sigma=2,thres_min=0.1,thres_peak=0.1,min_dist=1):
         '''
         parametrs distribution Lorenzian (area, center, width)
         '''
-        guess = np.hstack((self.width_and_area_peak_lorn()[0],self.width_and_area_peak_lorn()[1],self.center_peak( sigma,thres,min_dist)))
+        guess = np.hstack((self.width_and_area_peak_lorn(sigma,thres_min,thres_peak,min_dist)[0],self.width_and_area_peak_lorn(sigma,thres_min,thres_peak,min_dist)[1],self.center_peak( sigma,thres_peak,min_dist)))
         return guess
         
     
@@ -186,25 +186,25 @@ class Distribution(object):
     distribution Gaussian
     '''
        
-    def width_and_area_peak_gaus(self, sigma=2,thres=0.1,min_dist=1):
+    def width_and_area_peak_gaus(self, sigma=2,thres_min=0.1,thres_peak=0.1,min_dist=1):
         '''
         appoximate width and coefficient(area) distribution Gaussian
         '''
-        width = np.zeros(self.position_min_peak().size-1)
-        area = np.zeros(self.position_min_peak().size-1)
-        for i in np.arange(self.position_min_peak().size-1):
-            width[i] = (1/np.sqrt(2*np.pi))*(self.area_peak(i)/self.height_peak( sigma,thres,min_dist)[i])
+        width = np.zeros(self.position_min_peak(sigma,thres_min,min_dist).size-1)
+        area = np.zeros(self.position_min_peak(sigma,thres_min,min_dist).size-1)
+        for i in np.arange(self.position_min_peak(sigma,thres_min,min_dist).size-1):
+            width[i] = (1/np.sqrt(2*np.pi))*(self.area_peak(i,sigma,thres_min,min_dist)/self.height_peak( sigma,thres_peak,min_dist)[i])
             '''
             w = 1/(sqpr(2*pi) * y),  y = h/S
             '''
-            area[i] = self.area_peak(i) 
+            area[i] = self.area_peak(i,sigma,thres_min,min_dist) 
         return width , area
         
-    def guess_gaus(self, sigma=2,thres=0.1,min_dist=1):
+    def guess_gaus(self, sigma=2,thres_min=0.1,thres_peak=0.1,min_dist=1):
         '''
         parametrs distribution Gaussian (area, center, width)
         '''
-        guess = np.hstack((self.width_and_area_peak_gaus()[0],self.width_and_area_peak_gaus()[1],self.center_peak( sigma,thres,min_dist)))
+        guess = np.hstack((self.width_and_area_peak_gaus(sigma,thres_min,thres_peak,min_dist)[0],self.width_and_area_peak_gaus(sigma,thres_min,thres_peak,min_dist)[1],self.center_peak( sigma,thres_peak,min_dist)))
         return guess    
             
     
@@ -240,26 +240,26 @@ class Distribution(object):
     '''
     disrtibution Weibull
     '''
-    def gamma_width_area_peak_weibull(self, sigma=2,thres=0.1,min_dist=1):
+    def gamma_width_area_peak_weibull(self, sigma=2,thres_min=0.1,thres_peak=0.1,min_dist=1):
         '''
         appoximate width and coefficient(area) distribution Weibull
         '''
-        gamma = np.zeros(self.position_min_peak().size-1)+1
+        gamma = np.zeros(self.position_min_peak(sigma,thres_min,min_dist).size-1)+1
 #        area = np.zeros(self.position_min_peak().size-1)        
-        width = np.zeros(self.position_min_peak().size-1)
-        for i in np.arange(self.position_min_peak().size-1):
-            width[i] = (1/np.sqrt(2*np.pi))*(self.area_peak(i)/self.height_peak( sigma,thres,min_dist)[i])
+        width = np.zeros(self.position_min_peak(sigma,thres_min,min_dist).size-1)
+        for i in np.arange(self.position_min_peak(sigma,thres_min,min_dist).size-1):
+            width[i] = (1/np.sqrt(2*np.pi))*(self.area_peak(i,sigma,thres_min,min_dist)/self.height_peak( sigma,thres_peak,min_dist)[i])
             '''
             w = 2/(sqpr(pi) * y),  y = h/S
             '''
 #            area[i] = self.area_peak(i)
         return  width, gamma
         
-    def guess_weibull(self, sigma=2,thres=0.1,min_dist=1):
+    def guess_weibull(self, sigma=2,thres_min=0.1,thres_peak=0.1,min_dist=1):
         '''
         parametrs distribution Weibull (area, center, width)
         '''
-        guess = np.hstack((self. gamma_width_area_peak_weibull()[0],self. gamma_width_area_peak_weibull()[1],self.height_peak( sigma,thres,min_dist),self.center_peak( sigma,thres,min_dist)))
+        guess = np.hstack((self. gamma_width_area_peak_weibull(sigma,thres_min,thres_peak,min_dist)[0],self. gamma_width_area_peak_weibull(sigma,thres_min,thres_peak,min_dist)[1],self.height_peak( sigma,thres_peak,min_dist),self.center_peak( sigma,thres_peak,min_dist)))
         return guess   
         
     def weibull(self,height,width,x,center,gamma):
@@ -283,25 +283,31 @@ class Distribution(object):
 #        j=(gamma < 0) | (gamma > 2)
         return np.sum(( self.sum_weibull(args,x)-y)**2)#+ 2000*np.sum(gamma[j]**2)
        
-    def optim_lorenzian(self, sigma=2,thres=0.1,min_dist=1):
+    def callback(self,vector):
+        self.callback=np.hstack(self.callback,vector)
+
+       
+       
+    def optim_lorenzian(self, sigma=2,thres_min=0.1,thres_peak=0.1,min_dist=1, maxiter =2):
         '''
         optimization Lorenzian
         '''
-        optim = optimize.fmin_powell(self.sum_difference_square_lorenzian, self.guess_lorn( sigma,thres,min_dist) , args=(self.x_axis, self.line_new), maxiter = 2)
+        self.callback=self.guess_lorn(sigma,thres_min,thres_peak,min_dist) 
+        optim = optimize.fmin_powell(self.sum_difference_square_lorenzian, self.guess_lorn( sigma,thres_min,thres_peak,min_dist) , args=(self.x_axis, self.line_new),callback=self.callback(), maxiter = maxiter)
         return optim
         
-    def optim_gaussian(self, sigma=2,thres=0.1,min_dist=1):
+    def optim_gaussian(self, sigma=2,thres_min=0.1,thres_peak=0.1,min_dist=1, maxiter =2):
         '''
         optimization Gaussian
         '''
-        optim = optimize.fmin_powell(self.sum_difference_square_gaussian, self.guess_gaus( sigma,thres,min_dist) , args=(self.x_axis, self.line_new), maxiter = 2)
+        optim = optimize.fmin_powell(self.sum_difference_square_gaussian, self.guess_gaus( sigma,thres_min,thres_peak,min_dist) , args=(self.x_axis, self.line_new), maxiter = maxiter)
         return optim
     
-    def optim_weibull(self, sigma=2,thres=0.1,min_dist=1):
+    def optim_weibull(self, sigma=2,thres_min=0.1,thres_peak=0.1,min_dist=1, maxiter =2):
         '''
         optimization Weibull
         '''
-        optim = optimize.fmin_powell(self.sum_difference_square_weibull, self.guess_weibull( sigma,thres,min_dist) , args=(self.x_axis, self.line_new), maxiter = 2)
+        optim = optimize.fmin_powell(self.sum_difference_square_weibull, self.guess_weibull( sigma,thres_min,thres_peak,min_dist) , args=(self.x_axis, self.line_new), maxiter = maxiter)
         return optim
     
     def show_peak(self,arg):
