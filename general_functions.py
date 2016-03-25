@@ -284,7 +284,7 @@ class Distribution(object):
         return np.sum(( self.sum_weibull(args,x)-y)**2)#+ 2000*np.sum(gamma[j]**2)
        
     def callback(self,vector):
-        self.callback=np.hstack(self.callback,vector)
+        self.vector_optimize=np.hstack((self.vector_optimize,vector))
 
        
        
@@ -292,8 +292,9 @@ class Distribution(object):
         '''
         optimization Lorenzian
         '''
-        self.callback=self.guess_lorn(sigma,thres_min,thres_peak,min_dist) 
-        optim = optimize.fmin_powell(self.sum_difference_square_lorenzian, self.guess_lorn( sigma,thres_min,thres_peak,min_dist) , args=(self.x_axis, self.line_new),callback=self.callback(), maxiter = maxiter)
+        self.vector_optimize =self.guess_lorn(sigma,thres_min,thres_peak,min_dist)
+
+        optim = optimize.fmin_powell(self.sum_difference_square_lorenzian, self.guess_lorn( sigma,thres_min,thres_peak,min_dist) , args=(self.x_axis, self.line_new),callback=self.callback, maxiter = maxiter)
         return optim
         
     def optim_gaussian(self, sigma=2,thres_min=0.1,thres_peak=0.1,min_dist=1, maxiter =2):
